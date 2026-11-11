@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =====================================================================================================================
-# raptor-00-verifica.sh  -  Raptor AI 0.16.10  -  PASSO 0: verifica dei prerequisiti (prima di scaricare o copiare nulla)
+# raptor-install-check.sh  -  Raptor AI 0.16.10  -  verifica dei prerequisiti (prima di scaricare o copiare nulla)
 #
 # Si lancia per primo, su una scheda appena accesa con il sistema operativo che forniamo noi. Guarda soltanto: non
 # installa nulla, non cambia nulla, non chiede nulla. Alla fine dice "procedi" oppure cosa non va e perche'.
@@ -9,12 +9,12 @@
 # installazione.
 #
 # Uso (una riga, copiata dal nostro GitHub, sulla scheda appena accesa - non servono permessi di root):
-#     curl -fsSL https://raw.githubusercontent.com/<ORG>/<REPO>/main/install/raptor-00-verifica.sh | bash
+#     curl -fsSL https://raw.githubusercontent.com/Federiko78/Raptor-Ai-OrangePi4Pro-Ver.0.16.10/main/raptor-install-check.sh | bash
 #
 # oppure, se il file e' gia' sulla scheda:
-#     bash raptor-00-verifica.sh
+#     bash raptor-install-check.sh
 #
-# Uscita:  0 = nessun problema bloccante, si puo' procedere con raptor-01-utente.sh.
+# Uscita:  0 = nessun problema bloccante, si puo' procedere con l'installazione.
 #          1 = almeno un [FAIL]: elencato sotto, con il motivo. Un [WARN] non blocca, ma vale la pena guardarlo.
 #
 # Opzioni:
