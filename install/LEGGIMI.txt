@@ -1,0 +1,85 @@
+Raptor AI 0.16.10 - installazione pulita su una Orange Pi 4 Pro nuova
+=====================================================================
+
+Gli script stanno anche dentro il pacchetto (opt/raptor/install/), cosi' li ritrovi su ogni scheda gia' installata.
+
+FILE
+  raptor-00-verifica.sh             passo 0 (facoltativo, consigliato): controlla scheda, sistema, kernel, RAM, spazio, NPU
+                                    e rete PRIMA di copiare o scaricare qualunque cosa. Non installa e non cambia nulla.
+                                    Si lancia con un solo comando, come orangepi, senza FileZilla:
+                                        curl -fsSL <URL grezzo del file su GitHub> | bash
+                                    Se dice "non e' pronta", risolvi quello segnalato e rilancialo prima di passare al passo 1.
+  raptor-01-utente.sh               passo 1: crea l'utente raptor (con la sua password) e le cartelle di /opt/raptor
+  raptor-02-installa.sh             passo 2: cambia le password di root e orangepi, poi controlli, pacchetti, nome e ora,
+                                    Tailscale, programma, libreria NPU, modelli, Telegram, servizi
+  raptor_full_0.16.10_con_modelli.tar.gz     il programma completo CON i modelli (e il suo .sha256)
+  raptor_full_0.16.10_senza_modelli.tar.gz   il programma completo SENZA i modelli (e il suo .sha256): i modelli li copi tu
+  raptor-pacchetto-con-modelli.sh   (sulla scheda che ha i modelli) trasforma il pacchetto "senza" in quello "con"
+  raptor-audit.sh                   fotografia in sola lettura di una scheda, senza segreti (per controllare cosa c'e' installato)
+  raptor-salva-scheda.sh            salvataggio completo di una scheda in un solo archivio riservato (contiene segreti!)
+
+LA REGOLA: da una scheda nuova si entra una volta sola come orangepi, per creare l'utente raptor. Poi si lavora SEMPRE come raptor:
+FileZilla, terminale e installazione. Tutti i file che copi vanno in /home/raptor.
+
+PROCEDURA (la scheda e' nuova: utente orangepi, password di fabbrica)
+  1. FileZilla - connessione SFTP, porta 22, indirizzo della scheda, utente orangepi (password di fabbrica).
+     Copia in /home/orangepi UN SOLO file: raptor-01-utente.sh  (trasferimento Auto o Binario, mai ASCII).
+  2. Terminale (ssh orangepi@INDIRIZZO), come orangepi. Un solo comando, da qualunque cartella:
+         bash /home/orangepi/raptor-01-utente.sh
+     Lo script ti chiede la password di root (quella di fabbrica), crea l'utente raptor, ti fa scegliere la sua password
+     e prepara /opt/raptor. NON serve "su -" e non serve "cd".
+  3. FileZilla - connessione NUOVA: stesso indirizzo, utente raptor e la password che hai appena scelto.
+     Copia in /home/raptor:
+        - raptor-02-installa.sh
+        - raptor_full_0.16.10_con_modelli.tar.gz  e  raptor_full_0.16.10_con_modelli.tar.gz.sha256
+     (Se usi il pacchetto "senza modelli": copia anche i modelli, cioe' il CONTENUTO della cartella models della scheda vecchia,
+      dentro /opt/raptor/models. Se finisce in /opt/raptor/models/models va bene lo stesso: lo sistema il passo 2.)
+  4. Terminale (ssh raptor@INDIRIZZO), come raptor. Un solo comando, da qualunque cartella:
+         bash /home/raptor/raptor-02-installa.sh
+     Per prima cosa ti chiede la password di root (quella di fabbrica) e te la fa cambiare, insieme a quella di orangepi.
+     Poi installa tutto, ti chiede nome della scheda e Telegram.
+  5. Browser, http://INDIRIZZO:5000 : prima la licenza di questa scheda, poi la password dell'amministratore (utente: admin).
+     L'amministratore non lo crea lo script: fallo subito, perche' finche' non e' fatto chi apre per primo la pagina sceglie lui la password.
+
+SULLA SCHEDA VECCHIA, PRIMA DI METTERLA DA PARTE (come raptor, file copiati in /home/raptor)
+  a) Audit, in sola lettura, senza segreti (puoi allegarlo a una chat):
+         bash /home/raptor/raptor-audit.sh
+     Scrive raptor-audit-<scheda>-<data>.txt: cosa c'e' installato, quali file differiscono dal pacchetto, se i modelli sono integri.
+     Con   --pacchetto raptor_full_0.16.10_senza_modelli.tar.gz   confronta il codice con quel pacchetto.
+  b) Backup completo in un solo archivio (codice, config, modelli, database, /etc, registri, immagini Events AI):
+         bash /home/raptor/raptor-salva-scheda.sh --check-only          (guarda soltanto: cosa salva, quanto spazio serve)
+         bash /home/raptor/raptor-salva-scheda.sh --ferma-servizi       (copia a freddo: ferma i servizi, salva, li riavvia)
+     Crea raptor_scheda_<scheda>_<data>.tar.gz + .sha256 in /home/raptor. CONTIENE SEGRETI (token Telegram, password e-mail e Wi-Fi):
+     scaricalo con FileZilla, tienilo offline e non incollarlo in una chat. File sopra i 20 MB nelle cartelle personali non entrano:
+     lo script li elenca, copiali a parte se ti servono. Serve per consultare e riprendere pezzi singoli, non per rimetterlo tutto sopra una scheda nuova.
+  c) Il pacchetto "con modelli" (qui sotto).
+
+COME SI FA IL PACCHETTO "CON MODELLI" (una volta sola, sulla scheda vecchia che ha i modelli)
+  Copia in /home/raptor della scheda vecchia: raptor-pacchetto-con-modelli.sh, raptor_full_0.16.10_senza_modelli.tar.gz e il suo .sha256.
+  Come raptor:   bash /home/raptor/raptor-pacchetto-con-modelli.sh
+  Controlla ogni modello (somma sha256 contro il suo meta.json), crea raptor_full_0.16.10_con_modelli.tar.gz + .sha256 e lo verifica.
+  Serve circa il doppio dello spazio dei modelli oltre al pacchetto (con 1,5 GB di modelli: qualche GB liberi).
+  Se hai appena copiato dei file .nb sciolti in /opt/raptor/models, registrali prima:   python3 /opt/raptor/bin/raptor-models
+
+COSA NON VIENE PORTATO SULLA SCHEDA NUOVA (di proposito)
+  - la licenza (license.json e license-state.json): e' legata alla scheda, la nuova va attivata dal pannello;
+  - password, token Telegram, chiavi SSH e Tailscale: si rifanno sulla scheda nuova (il token Telegram lo digiti tu durante il passo 2);
+  - telecamere, zone e impostazioni: non sono nel pacchetto. Prima di spegnere la vecchia scheda scarica il suo backup dal pannello
+    (Settings > Maintenance > Backup) e ripristinalo sulla nuova (stessa pagina, Ripristino); oppure si rifanno a mano;
+  - strumenti del produttore (vpm_run*, firmware, libreria NPU gia' compilata): la libreria si ricompila da sola nel passo 2.
+
+Se uno script si ferma, dice perche' (righe [FAIL]). Sistema e rilancialo: rifa' solo quello che manca.
+Se scrivi il nome del file senza il percorso e ti risponde "No such file or directory", sei in una cartella diversa da quella dei file:
+usa sempre il percorso completo (/home/raptor/...).
+Prima di cambiare qualcosa puoi guardare soltanto:
+     bash /home/orangepi/raptor-01-utente.sh --check-only
+     bash /home/raptor/raptor-02-installa.sh --check-only
+
+Le password di sistema (root, orangepi, raptor) e il token Telegram li digiti tu sulla scheda: nascosti, mai scritti negli script
+ne' nei registri (/root/raptor-utente-*.log, /root/raptor-installa-*.log). La password admin del pannello la scegli dalla pagina web.
+
+La licenza e' legata alla scheda: ogni scheda nuova va attivata (la licenza della scheda vecchia non si copia).
+Tailscale viene installato (--no-tailscale per non farlo) ma non collegato: il collegamento lo fai dal pannello (Settings > Application > Tailscale).
+
+Le intestazioni in native/vendor/include sono file del produttore dell'NPU (Vivante/Allwinner): servono solo a compilare
+libraptor_npu.so sulla tua scheda, non vanno ridistribuite.
