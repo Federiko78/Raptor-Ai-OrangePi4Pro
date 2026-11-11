@@ -7,7 +7,7 @@ FILE
   raptor-00-verifica.sh             passo 0 (facoltativo, consigliato): controlla scheda, sistema, kernel, RAM, spazio, NPU
                                     e rete PRIMA di copiare o scaricare qualunque cosa. Non installa e non cambia nulla.
                                     Si lancia con un solo comando, come orangepi, senza FileZilla:
-                                        curl -fsSL <URL grezzo del file su GitHub> | bash
+                                        curl -fsSL https://raw.githubusercontent.com/Federiko78/Raptor-Ai-OrangePi4Pro-Ver.0.16.10/main/install/raptor-00-verifica.sh | bash
                                     Se dice "non e' pronta", risolvi quello segnalato e rilancialo prima di passare al passo 1.
   raptor-01-utente.sh               passo 1: crea l'utente raptor (con la sua password) e le cartelle di /opt/raptor
   raptor-02-installa.sh             passo 2: cambia le password di root e orangepi, poi controlli, pacchetti, nome e ora,
