@@ -1,4 +1,8 @@
 <p align="center">
+  <a href="https://github.com/ultralytics/ultralytics"><img src="https://img.shields.io/badge/Powered%20by-Ultralytics%20YOLO-00A3E0?style=for-the-badge" alt="Powered by Ultralytics YOLO"></a>
+</p>
+
+<p align="center">
   <img src="assets/login.png" alt="Raptor AI" width="640">
 </p>
 
@@ -8,12 +12,25 @@ Smart-detection video surveillance system, NPU-accelerated, for the Orange Pi 4 
 
 ## Features
 
-- **Live Stream** — all your cameras in one view, live.
-- **Intrusion AI** — zone-based detection with multi-sample confirmation and movement tracking, so a stray shadow or a passing cat doesn't trigger a false alarm:
+**Live Stream** — all your cameras in one view, live.
+
+<img src="assets/live-stream.png" alt="Live Stream" width="720">
+
+**Intrusion AI** — zone-based detection with multi-sample confirmation and movement tracking, so a stray shadow or a passing cat doesn't trigger a false alarm.
+
+<img src="assets/intrusion-ai.png" alt="Intrusion AI" width="720">
 
 <img src="assets/detector-profile.png" alt="Detector profile: how a detection is confirmed" width="720">
 
-Also included: Events AI, Statistics, a Watchdog that reports when a camera goes offline, Telegram/e-mail notifications, and a GPIO-based alarm relay — all configured from the same panel.
+**Statistics** — alarm history and detector performance, per camera, over time.
+
+<img src="assets/statistics.png" alt="Statistics" width="720">
+
+**Camera Manager** — add, test and configure every RTSP camera from one screen.
+
+<img src="assets/camera-manager.png" alt="Camera Manager" width="720">
+
+Also included: Events AI, a Watchdog that reports when a camera goes offline, Telegram/e-mail notifications, and a GPIO-based alarm relay — all configured from the same panel.
 
 ## Prerequisites
 
