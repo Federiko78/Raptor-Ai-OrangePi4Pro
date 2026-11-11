@@ -1,19 +1,17 @@
 # Raptor AI — Orange Pi 4 Pro
 
-Sistema di videosorveglianza con rilevamento intelligente (NPU), per la scheda Orange Pi 4 Pro.
+Smart-detection video surveillance system (NPU-accelerated), for the Orange Pi 4 Pro board.
 
-## Installazione
+## Installation
 
-Sulla scheda appena accesa, con il sistema operativo che forniamo noi, come utente `orangepi` (non servono permessi di root): un solo comando.
+On a freshly powered-on board, running the OS image we provide, as the `orangepi` user (no root needed): one command.
 
 ```
-curl -fsSL https://raw.githubusercontent.com/Federiko78/Raptor-Ai-OrangePi4Pro-Ver.0.16.10/Ai/install/raptor-00-verifica.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Federiko78/Raptor-Ai-OrangePi4Pro-Ver.0.16.10/main/install/raptor-00-verifica.sh | bash
 ```
 
-Controlla che la scheda vada bene — sistema operativo, kernel, memoria, spazio, NPU, rete — e dice se si può procedere. Non installa e non cambia nulla.
+This checks that the board is ready — OS, kernel, memory, free space, NPU, network — and tells you whether you can proceed. It makes no changes and installs nothing.
 
-> Il link "Source code" che vedi nella pagina della release è generato automaticamente da GitHub: non serve per l'installazione, si può ignorare.
+## What's in this repository
 
-## Cosa c'è in questo repository
-
-La cartella [`install/`](install/) contiene gli script di installazione e manutenzione, documentati in [`install/LEGGIMI.txt`](install/LEGGIMI.txt).
+The [`install/`](install/) folder contains the installation and maintenance scripts, documented in [`install/LEGGIMI.txt`](install/LEGGIMI.txt) (in Italian — the scripts' own prompts and messages are in Italian too).
