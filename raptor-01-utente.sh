@@ -22,6 +22,8 @@
 #     --no-password        non chiede la password di raptor (l'utente resta senza accesso con password: solo per prove)
 #     --yes                risponde con la scelta predefinita alle domande si/no (la password resta a te)
 #     --force              prosegue anche se la scheda o il sistema non sembrano una Orange Pi 4 Pro con Debian 12
+#     --no-next-steps      non stampa le istruzioni manuali finali (FileZilla, ssh, passo 2): per chi lo lancia da un
+#                           altro script che continua da solo (es. raptor-install.sh)
 #     --help
 #
 # Un registro (senza password) resta in /root/raptor-utente-DATA.log
@@ -37,6 +39,7 @@ CHECK_ONLY=0
 NO_PASSWORD=0
 ASSUME_YES=0
 FORCE=0
+NO_NEXT_STEPS=0
 
 usage() { awk 'NR==1{next} /^# =+$/{n++; if(n==2) exit; next} n==1{sub(/^# ?/,""); print}' "$0"; }
 
@@ -47,6 +50,7 @@ while [ $# -gt 0 ]; do
     --yes|-y) ASSUME_YES=1 ;;
     --force) FORCE=1 ;;
     --elevated) ELEVATED=1 ;;
+    --no-next-steps) NO_NEXT_STEPS=1 ;;   # chi lancia questo script da un orchestratore continua da solo: non servono le istruzioni manuali qui sotto
     -h|--help) usage; exit 0 ;;
     *) printf 'Opzione sconosciuta: %s  (vedi --help)\n' "$1" >&2; exit 2 ;;
   esac
@@ -295,6 +299,10 @@ fi
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 say "${C_OK}Passo 1 finito.${C_0} Da qui in poi lavori come ${C_B}raptor${C_0}, non piu' come orangepi."
 say ""
+if [ "$NO_NEXT_STEPS" = 1 ]; then
+  say "Registro: $LOG"
+  exit 0
+fi
 say "  1) FileZilla: connessione NUOVA, protocollo SFTP, porta 22, indirizzo ${IP:-<indirizzo della scheda>}, utente ${C_B}raptor${C_0} e la password che hai appena scelto."
 say "     Copia nella sua cartella  /home/$RAPTOR_USER  questi file (trasferimento Auto o Binario, mai ASCII):"
 say "        - raptor-02-installa.sh"

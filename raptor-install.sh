@@ -86,7 +86,7 @@ say ""
 say "${C_B}2/3 - preparazione (utente raptor)${C_0}"
 fetch "$REPO_RAW/raptor-01-utente.sh" "$WORK/raptor-01-utente.sh"
 chmod +x "$WORK/raptor-01-utente.sh"
-bash "$WORK/raptor-01-utente.sh" || die "il passo 1 ha avuto problemi (vedi sopra): correggili e rilancia questo stesso comando, riparte solo da dove serve."
+bash "$WORK/raptor-01-utente.sh" --no-next-steps || die "il passo 1 ha avuto problemi (vedi sopra): correggili e rilancia questo stesso comando, riparte solo da dove serve."
 say ""
 
 # ========================================================================================= 3. l'installazione vera
@@ -106,6 +106,7 @@ exec bash "$DEST/raptor-02-installa.sh"
 PHASE2_EOF
 chmod 755 "$PHASE2"   # leggibile da raptor (lo esegue "su - raptor"), non solo da orangepi che l'ha creato
 
+say "Ora ti chiedo la ${C_B}password di raptor${C_0} (quella appena scelta nel passo 2) per continuare da quell'utente."
 if ! su - raptor -c "bash '$PHASE2' '$REPO_RAW/raptor-02-installa.sh' '$PACKAGE_URL'"; then
   die "il passo 2 ha avuto problemi (vedi sopra). Puoi rilanciare solo questa parte entrando come raptor:
        ssh raptor@$(hostname -I 2>/dev/null | awk '{print $1}')
