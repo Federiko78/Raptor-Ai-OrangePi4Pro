@@ -52,9 +52,14 @@ say "${C_B}Raptor AI - installazione automatica${C_0}"
 say ""
 
 # --------------------------------------------------------------------------------------------------- un terminale vero
-# Lo script arriva qui tramite "curl | bash": il suo stdin e' la pipe con il codice dello script stesso, non la
-# tastiera. Serve riattaccare l'ingresso al terminale vero prima di qualsiasi domanda (password, nome scheda, ...).
-exec < /dev/tty 2>/dev/null || die "questo script ha bisogno di un terminale interattivo (ti chiedera' delle password): lancialo da una sessione ssh o dalla console della scheda, non da un contesto senza terminale (es. uno script non interattivo)."
+# Per sicurezza, se qualcuno lo lancia comunque con "curl | bash": riattacca l'ingresso al terminale vero prima di
+# qualsiasi domanda (password, nome scheda, ...). Il controllo si fa in una sottoshell, con il suo "2>/dev/null" tutto
+# per se' (solo per non mostrare l'errore "No such device" se /dev/tty non esiste) -- SENZA toccare lo stderr DI QUESTA
+# shell: un "exec ... 2>/dev/null" diretto qui lo azzererebbe per il resto dello script e di tutto cio' che lancia,
+# nascondendo anche i prompt delle password piu' avanti (visti scritti con '>&2', non spariti: solo mai arrivati sullo
+# schermo). Capitato una volta, da qui non si ripete.
+( exec < /dev/tty ) 2>/dev/null || die "questo script ha bisogno di un terminale interattivo (ti chiedera' delle password): lancialo da una sessione ssh o dalla console della scheda, non da un contesto senza terminale (es. uno script non interattivo)."
+exec < /dev/tty
 
 [ "$(id -u)" -eq 0 ] && die "lancia questo script come utente orangepi, non come root (e non con sudo): e' lui che si fa dare i permessi quando servono."
 [ "$(id -un)" = "orangepi" ] || say "nota: di solito questo script si lancia come 'orangepi' su una scheda nuova; procedo comunque come $(id -un)."
