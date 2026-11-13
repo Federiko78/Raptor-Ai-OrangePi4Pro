@@ -4,7 +4,12 @@
 #
 # Un solo comando, lanciato come utente orangepi su una scheda appena flashata con la nostra immagine:
 #
-#     curl -fsSL https://raw.githubusercontent.com/Federiko78/Raptor-Ai-OrangePi4Pro-Ver.0.16.10/main/raptor-install.sh | bash
+#     curl -fsSL https://raw.githubusercontent.com/Federiko78/Raptor-Ai-OrangePi4Pro-Ver.0.16.10/main/raptor-install.sh -o raptor-install.sh && bash raptor-install.sh
+#
+# (NON con "curl | bash": lo script deve riattaccare l'input al terminale vero per chiedere le password piu' avanti,
+#  e se arriva tramite una pipe quel riattacco interrompe anche la lettura del resto dello script da quella stessa
+#  pipe -- si blocca in silenzio, senza errori, proprio nel punto dell'exec. Scaricarlo su file ed eseguirlo evita
+#  del tutto il problema: resta comunque un solo comando da copiare e lanciare.)
 #
 # Fa tutto da solo: scarica ed esegue raptor-01-utente.sh (crea l'utente raptor), poi scarica il pacchetto compilato
 # e raptor-02-installa.sh e li esegue come raptor (installazione vera). Niente FileZilla, niente passaggi a mano:
@@ -37,7 +42,7 @@ while [ $# -gt 0 ]; do
     --repo) REPO_RAW="${2:?manca l'URL dopo --repo}"; shift 2 ;;
     --package) PACKAGE_URL="${2:?manca l'URL dopo --package}"; shift 2 ;;
     --help)
-      sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
       exit 0 ;;
     *) die "opzione sconosciuta: $1 (vedi --help)" ;;
   esac
