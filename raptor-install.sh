@@ -86,7 +86,7 @@ say ""
 say "${C_B}2/3 - preparazione (utente raptor)${C_0}"
 fetch "$REPO_RAW/raptor-01-utente.sh" "$WORK/raptor-01-utente.sh"
 chmod +x "$WORK/raptor-01-utente.sh"
-bash "$WORK/raptor-01-utente.sh" --no-next-steps || die "il passo 1 ha avuto problemi (vedi sopra): correggili e rilancia questo stesso comando, riparte solo da dove serve."
+bash "$WORK/raptor-01-utente.sh" --no-next-steps --yes || die "il passo 1 ha avuto problemi (vedi sopra): correggili e rilancia questo stesso comando, riparte solo da dove serve."
 say ""
 
 # ========================================================================================= 3. l'installazione vera
@@ -102,7 +102,7 @@ DEST="$HOME"
 curl -fsSL --retry 3 --retry-delay 2 -o "$DEST/raptor-02-installa.sh" "$1" || { echo "scaricamento di raptor-02-installa.sh fallito"; exit 1; }
 curl -fsSL --retry 3 --retry-delay 2 -o "$DEST/raptor_full_compiled.tar.gz" "$2" || { echo "scaricamento del pacchetto fallito"; exit 1; }
 chmod +x "$DEST/raptor-02-installa.sh"
-exec bash "$DEST/raptor-02-installa.sh"
+exec bash "$DEST/raptor-02-installa.sh" --yes --no-telegram
 PHASE2_EOF
 chmod 755 "$PHASE2"   # leggibile da raptor (lo esegue "su - raptor"), non solo da orangepi che l'ha creato
 
