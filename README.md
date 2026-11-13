@@ -43,7 +43,7 @@ Also included: Events AI, a Watchdog that reports when a camera goes offline, Te
 | **Storage** | at least 3 GB free (8 GB+ recommended — event recordings grow over time) |
 | **Storage media** | highly recommended: an NVMe SSD, PCIe Gen3x4 (e.g. fanxiang S501 128 GB) — a microSD works too, Class V30 minimum, V60 recommended |
 | **NPU** | driver and libraries already present in our image |
-| **Network** | internet access (to download the installer, and later the 14-day trial license) |
+| **Network** | internet access to download the installer; not required to use the 30-day trial below, only later if you activate a paid licence |
 
 Don't have our image yet, or not sure which version you have? Flash it first — installing on anything else isn't supported and the check below will stop you.
 
@@ -56,3 +56,12 @@ curl -fsSL https://raw.githubusercontent.com/Federiko78/Raptor-Ai-OrangePi4Pro-V
 ```
 
 This checks that the board is ready — OS, kernel, memory, free space, NPU, network — and tells you whether you can proceed. It makes no changes and installs nothing. The full guided installation follows once the check passes.
+
+## Licensing
+
+The first time you create the admin account in the panel, Raptor AI starts a **30-day free trial** on its own — no internet connection, activation code, or contact with us required. The trial gives you:
+
+- 1 camera
+- the STANDARD-tier features (Live Stream, Intrusion AI, Events AI, Camera Manager, the GPIO alarm relay)
+
+A banner in the panel shows how many days are left. When the trial ends, or whenever you're ready for more cameras or the higher tiers (Statistics, Watchdog, Camera Manager's network search, Telegram/e-mail notifications, Logs), activate a paid licence from the same panel — that step does need an internet connection, to reach our licensing server.
