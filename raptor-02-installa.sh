@@ -6,21 +6,24 @@
 # in /home/raptor: questo script, il pacchetto raptor_full_0.16.10_*.tar.gz (con il suo .sha256) e, se il pacchetto e' quello
 # "senza modelli", i modelli in /opt/raptor/models.
 #
-# Cosa fa, in undici passi (e dice sempre cosa sta facendo):
+# Cosa fa, in dodici passi (e dice sempre cosa sta facendo):
 #    1. controlla l'ambiente e il pacchetto (non cambia nulla); poi ti chiede conferma
 #    2. cambia le password di root e orangepi (oggi sono quelle di fabbrica): le scrivi TU, nascoste
 #    3. nome della scheda, fuso orario, sincronizzazione dell'ora (chrony)
-#    4. installa i pacchetti che mancano (ffmpeg, numpy, opencv, yaml, cryptography, gcc, nftables, ...)
-#    5. crea l'ambiente virtuale Python
-#    6. installa Tailscale (assistenza remota dal pannello): di serie si', --no-tailscale per non installarlo
-#    7. verifica il pacchetto, lo estrae in /opt/raptor e controlla ogni file (MANIFEST.sha256)
-#    8. compila la libreria NPU (libraptor_npu.so)
-#    9. controlla i modelli (quelli del pacchetto, o copiati con FileZilla) e li sistema
-#   10. installa raptor-auth e raptor-admin; Telegram (se vuoi: token del bot e destinatari, digitati da te)
-#   11. installa e avvia i 5 servizi, controlla che tutto sia acceso e ti dice l'indirizzo del pannello
+#    4. blocca gli aggiornamenti automatici del sistema (apt-daily/unattended-upgrades) e il pacchetto del kernel
+#    5. installa i pacchetti che mancano (ffmpeg, numpy, opencv, yaml, cryptography, gcc, nftables, ...)
+#    6. crea l'ambiente virtuale Python
+#    7. installa Tailscale (assistenza remota dal pannello): di serie si', --no-tailscale per non installarlo
+#    8. verifica il pacchetto, lo estrae in /opt/raptor e controlla ogni file (MANIFEST.sha256)
+#    9. compila la libreria NPU (libraptor_npu.so)
+#   10. controlla i modelli (quelli del pacchetto, o copiati con FileZilla) e li sistema
+#   11. installa raptor-auth e raptor-admin; Telegram (se vuoi: token del bot e destinatari, digitati da te)
+#   12. installa e avvia i 5 servizi, controlla che tutto sia acceso e ti dice l'indirizzo del pannello
 #
 # L'amministratore del pannello NON lo crea lo script: lo crei dalla pagina web di Raptor (prima la licenza, poi la password).
-# Non fa "apt upgrade": su queste schede un aggiornamento del kernel o dei driver puo' rompere l'NPU.
+# Non fa "apt upgrade", e dal passo 4 blocca anche gli aggiornamenti automatici in background: su queste schede un
+# aggiornamento del kernel o dei driver (anche se arriva da solo di notte) puo' rompere l'NPU -- deve essere sempre
+# una scelta esplicita, mai qualcosa che succede senza che nessuno lo decida.
 # Si puo' rilanciare: se Raptor e' gia' installato con la stessa versione rifa' i passi (config, dati e modelli non si toccano);
 # con un'altra versione si ferma: per aggiornare usa il pacchetto di aggiornamento, oppure --force.
 #
@@ -60,7 +63,7 @@ TELEGRAM="ask"                         # ask | yes | no
 NPU_BUILD=1
 ASSUME_YES=0
 FORCE=0
-NSTEPS=11
+NSTEPS=12
 SKIP_PASSWORDS=0
 
 # librerie NPU dell'immagine della scheda di riferimento (solo per dire se sono uguali o diverse)
@@ -510,8 +513,41 @@ if command -v chronyc >/dev/null 2>&1; then
   else warn "l'ora non e' ancora sincronizzata (chrony: ${TR:-sconosciuto}); riprova tra qualche minuto con:  chronyc tracking"; fi
 fi
 
-# ================================================================================================ 4. pacchetti
-step 4 "Pacchetti"
+# ================================================================================================ 4. aggiornamenti automatici
+step 4 "Blocco degli aggiornamenti automatici (il kernel non deve cambiare da solo)"
+# apt-daily/apt-daily-upgrade sono i timer di sistema che fanno scattare un "apt update/upgrade" in background: sono
+# loro a far partire unattended-upgrades anche quando nessuno lo ha mai configurato esplicitamente. Su una scheda con
+# driver NPU legati a un kernel preciso, un riavvio notturno che installa un kernel diverso puo' lasciare la scheda
+# senza NPU (vedi la nota sul kernel BSP qui sopra): un aggiornamento deve essere sempre una scelta esplicita.
+systemctl disable --now apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1
+systemctl mask apt-daily.service apt-daily-upgrade.service >/dev/null 2>&1
+if ! systemctl is-enabled apt-daily.timer >/dev/null 2>&1 && ! systemctl is-enabled apt-daily-upgrade.timer >/dev/null 2>&1; then
+  ok "timer apt-daily disattivati (niente piu' 'apt update/upgrade' in background)"
+else
+  warn "non sono riuscito a disattivare del tutto i timer apt-daily: controllali a mano con 'systemctl list-timers'"
+fi
+cat >/etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
+// Raptor: nessun aggiornamento automatico. Un aggiornamento del kernel o dei driver puo' rompere l'NPU: deve essere
+// sempre una scelta esplicita, mai qualcosa che succede da solo di notte.
+APT::Periodic::Update-Package-Lists "0";
+APT::Periodic::Unattended-Upgrade "0";
+EOF
+ok "unattended-upgrades disattivato (/etc/apt/apt.conf.d/20auto-upgrades)"
+if [ -f /etc/apt/apt.conf.d/50unattended-upgrades ] && grep -q 'Unattended-Upgrade::Automatic-Reboot "true"' /etc/apt/apt.conf.d/50unattended-upgrades; then
+  sed -i 's/Unattended-Upgrade::Automatic-Reboot "true"/Unattended-Upgrade::Automatic-Reboot "false"/' /etc/apt/apt.conf.d/50unattended-upgrades
+  ok "riavvio automatico disattivato anche in 50unattended-upgrades"
+fi
+KPKGS="$(dpkg-query -W -f='${Package}\n' 2>/dev/null | grep -E '^(linux-image|linux-headers|linux-dtb|linux-u-boot|linux-firmware-image|flash-kernel)' || true)"
+if [ -n "$KPKGS" ]; then
+  # shellcheck disable=SC2086
+  apt-mark hold $KPKGS >/dev/null 2>&1
+  ok "pacchetti del kernel/bootloader bloccati (apt-mark hold): $(printf '%s' "$KPKGS" | tr '\n' ' ')"
+else
+  warn "nessun pacchetto kernel/bootloader riconosciuto da bloccare: controlla a mano con 'dpkg -l | grep linux-image'"
+fi
+
+# ================================================================================================ 5. pacchetti
+step 5 "Pacchetti"
 if [ "${#MISSING[@]}" -eq 0 ]; then
   ok "niente da installare"
 elif [ "$NET" != 1 ]; then
@@ -539,8 +575,8 @@ if [ "$N_BAD" -gt 0 ] && { ! command -v runuser >/dev/null 2>&1 || ! python3 -c 
   die "mancano pacchetti indispensabili (vedi sopra): non vado avanti. Sistemali e rilancia."
 fi
 
-# ================================================================================================ 5. ambiente virtuale
-step 5 "Ambiente virtuale Python"
+# ================================================================================================ 6. ambiente virtuale
+step 6 "Ambiente virtuale Python"
 if [ -x "$R/venv/bin/python" ]; then ok "ambiente virtuale gia' presente: $R/venv"
 elif as_raptor python3 -m venv --system-site-packages "$R/venv" >>"$LOG" 2>&1; then
   ok "ambiente virtuale creato: $R/venv (con i pacchetti di sistema)"
@@ -551,8 +587,8 @@ else
 fi
 info "nota: i servizi Raptor usano il Python di sistema (/usr/bin/python3); il venv serve solo per strumenti e prove a mano"
 
-# ================================================================================================ 6. Tailscale
-step 6 "Tailscale (assistenza remota)"
+# ================================================================================================ 7. Tailscale
+step 7 "Tailscale (assistenza remota)"
 if command -v tailscale >/dev/null 2>&1; then
   ok "Tailscale gia' installato: $(tailscale version 2>/dev/null | head -1)"
 elif [ "$TAILSCALE" = no ]; then
@@ -569,8 +605,8 @@ else
   fi
 fi
 
-# ================================================================================================ 7. programma
-step 7 "Programma in $R"
+# ================================================================================================ 8. programma
+step 8 "Programma in $R"
 PARENT="$(dirname "$R")"
 if tar -xzf "$TAR" -C "$PARENT" --strip-components=1 --no-same-owner --no-overwrite-dir >>"$LOG" 2>&1; then ok "programma estratto in $R"; else die "estrazione fallita (disco pieno? vedi il registro)"; fi
 for d in alarm bin common detector install native notifications services tests watchdog web; do
@@ -590,16 +626,16 @@ fi
 INSTALLED_VER="$(sed -n 's/^VERSION *= *"\(.*\)".*/\1/p' "$R/web/web.py" | head -1)"
 [ "$INSTALLED_VER" = "$VER" ] && ok "versione installata: $INSTALLED_VER" || bad "versione installata '$INSTALLED_VER' diversa da quella del pacchetto '$VER'"
 
-# ================================================================================================ 8. libreria NPU
-step 8 "Libreria NPU (libraptor_npu.so)"
+# ================================================================================================ 9. libreria NPU
+step 9 "Libreria NPU (libraptor_npu.so)"
 if [ "$NPU_BUILD" != 1 ]; then info "saltata (--no-npu-build)"
 elif [ ! -f "$R/native/vendor/include/vip_lite.h" ]; then warn "manca $R/native/vendor/include/vip_lite.h: libreria NPU non compilata"
 elif [ ! -f /usr/lib/libVIPhal.so ]; then warn "manca /usr/lib/libVIPhal.so: libreria NPU non compilata"
 elif as_raptor bash "$R/detector/npu/build.sh" >>"$LOG" 2>&1 && [ -f "$R/detector/npu/libraptor_npu.so" ]; then ok "libraptor_npu.so compilata"
 else bad "compilazione della libreria NPU fallita (vedi il registro): il motore funzionera' senza NPU finche' non la sistemi"; fi
 
-# ================================================================================================ 9. modelli
-step 9 "Modelli (in $R/models)"
+# ================================================================================================ 10. modelli
+step 10 "Modelli (in $R/models)"
 MODELS="$R/models"
 # a) la cartella copiata invece del suo contenuto: models/models/<id>/... -> models/<id>/...
 if [ -d "$MODELS/models" ]; then
@@ -670,8 +706,8 @@ elif [ "${N_BADM:-0}" -eq 0 ]; then
   warn "nessun modello in $MODELS: senza non c'e' rilevamento. Copiali con FileZilla in $MODELS e rilancia questo script (rifa' solo quello che manca)"
 fi
 
-# ================================================================================================ 10. root e Telegram
-step 10 "Programmi di root e Telegram"
+# ================================================================================================ 11. root e Telegram
+step 11 "Programmi di root e Telegram"
 if python3 -I "$R/bin/raptor-auth" install >>"$LOG" 2>&1 && [ -x /usr/local/sbin/raptor-auth ]; then ok "raptor-auth installato in /usr/local/sbin (recupero password del pannello)"
 else bad "installazione di raptor-auth fallita"; fi
 if python3 -I "$R/services/admin/install.py" >>"$LOG" 2>&1; then ok "raptor-admin installato (rete, ora, spegnimento, assistenza remota dal pannello)"
@@ -756,8 +792,8 @@ print("scritto:%d" % len(recips))
   TG_TOKEN=""; RECIPIENTS=""
 fi
 
-# ================================================================================================ 11. servizi e controlli
-step 11 "Servizi (partono anche a ogni avvio della scheda) e controlli finali"
+# ================================================================================================ 12. servizi e controlli
+step 12 "Servizi (partono anche a ogni avvio della scheda) e controlli finali"
 python3 -I "$R/services/raptor_services.py" install 2>&1 | tee -a "$LOG" | sed 's/^/         /'
 RC="${PIPESTATUS[0]}"
 if [ "$RC" -eq 0 ]; then ok "5 servizi installati, abilitati e avviati; controllo di indipendenza superato"; else bad "l'installazione dei servizi ha segnalato problemi (sopra)"; fi
