@@ -4,7 +4,7 @@
 #
 # Un solo comando, lanciato come utente orangepi su una scheda appena flashata con la nostra immagine:
 #
-#     curl -fsSL https://raw.githubusercontent.com/Federiko78/Raptor-Ai-OrangePi4Pro-Ver.0.16.10/main/raptor-install.sh -o raptor-install.sh && bash raptor-install.sh
+#     curl -fsSL https://raw.githubusercontent.com/Federiko78/Raptor-Ai-OrangePi4Pro/main/raptor-install.sh -o raptor-install.sh && bash raptor-install.sh
 #
 # (NON con "curl | bash": lo script deve riattaccare l'input al terminale vero per chiedere le password piu' avanti,
 #  e se arriva tramite una pipe quel riattacco interrompe anche la lettura del resto dello script da quella stessa
@@ -25,8 +25,8 @@
 # =====================================================================================================================
 set -u -o pipefail
 
-DEFAULT_REPO_RAW="https://raw.githubusercontent.com/Federiko78/Raptor-Ai-OrangePi4Pro-Ver.0.16.10/main"
-DEFAULT_PACKAGE_URL="https://github.com/Federiko78/Raptor-Ai-OrangePi4Pro-Ver.0.16.10/releases/latest/download/raptor_full_compiled.tar.gz"
+DEFAULT_REPO_RAW="https://raw.githubusercontent.com/Federiko78/Raptor-Ai-OrangePi4Pro/main"
+DEFAULT_PACKAGE_URL="https://github.com/Federiko78/Raptor-Ai-OrangePi4Pro/releases/latest/download/raptor_full_compiled.tar.gz"
 REPO_RAW="$DEFAULT_REPO_RAW"
 PACKAGE_URL="$DEFAULT_PACKAGE_URL"
 

@@ -9,7 +9,7 @@
 # installazione.
 #
 # Uso (una riga, copiata dal nostro GitHub, sulla scheda appena accesa - non servono permessi di root):
-#     curl -fsSL https://raw.githubusercontent.com/Federiko78/Raptor-Ai-OrangePi4Pro-Ver.0.16.10/main/raptor-install-check.sh | bash
+#     curl -fsSL https://raw.githubusercontent.com/Federiko78/Raptor-Ai-OrangePi4Pro/main/raptor-install-check.sh | bash
 #
 # oppure, se il file e' gia' sulla scheda:
 #     bash raptor-install-check.sh

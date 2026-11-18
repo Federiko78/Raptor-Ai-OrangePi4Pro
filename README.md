@@ -52,7 +52,7 @@ Don't have our image yet, or not sure which version you have? Flash it first —
 On a freshly powered-on board, running the OS image we provide, as the `orangepi` user (no root needed): one command.
 
 ```
-curl -fsSL https://raw.githubusercontent.com/Federiko78/Raptor-Ai-OrangePi4Pro-Ver.0.16.10/main/raptor-install.sh -o raptor-install.sh && bash raptor-install.sh
+curl -fsSL https://raw.githubusercontent.com/Federiko78/Raptor-Ai-OrangePi4Pro/main/raptor-install.sh -o raptor-install.sh && bash raptor-install.sh
 ```
 
 That's it — one line, copy-pasted and run. It checks the board is ready (OS, kernel, memory, free space, NPU, network), creates the `raptor` user, and downloads and installs Raptor AI, asking only for what it genuinely needs along the way (a couple of passwords, the board's hostname, and — optionally — Telegram notifications). No file transfers, no juggling multiple terminal sessions.
@@ -62,7 +62,7 @@ It does not include the YOLO detection models: the panel comes up and the 30-day
 Just want to check whether a board is ready, without installing anything yet?
 
 ```
-curl -fsSL https://raw.githubusercontent.com/Federiko78/Raptor-Ai-OrangePi4Pro-Ver.0.16.10/main/raptor-install-check.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Federiko78/Raptor-Ai-OrangePi4Pro/main/raptor-install-check.sh | bash
 ```
 
 ## Licensing
