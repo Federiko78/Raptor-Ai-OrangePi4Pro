@@ -244,6 +244,7 @@ if [ -d "/home/$RAPTOR_USER" ]; then
   chown "$RAPTOR_USER:$RAPTOR_USER" "/home/$RAPTOR_USER" && ok "cartella /home/$RAPTOR_USER di proprieta' di $RAPTOR_USER (e' qui che copierai i file con FileZilla)"
 fi
 
+SET_PW=0   # usato piu' sotto, nelle istruzioni finali, per dire la password giusta anche se qui non viene toccata
 if id "$RAPTOR_USER" >/dev/null 2>&1; then
   if [ "$NO_PASSWORD" = 1 ]; then
     info "--no-password: non chiedo la password di $RAPTOR_USER (senza, non potrai entrare come raptor con ssh o FileZilla)"
@@ -303,7 +304,8 @@ if [ "$NO_NEXT_STEPS" = 1 ]; then
   say "Registro: $LOG"
   exit 0
 fi
-say "  1) FileZilla: connessione NUOVA, protocollo SFTP, porta 22, indirizzo ${IP:-<indirizzo della scheda>}, utente ${C_B}raptor${C_0} e la password che hai appena scelto."
+if [ "$SET_PW" = 1 ]; then PWHINT="la password che hai appena scelto"; else PWHINT="la password che raptor aveva gia' (non e' stata cambiata)"; fi
+say "  1) FileZilla: connessione NUOVA, protocollo SFTP, porta 22, indirizzo ${IP:-<indirizzo della scheda>}, utente ${C_B}raptor${C_0} e $PWHINT."
 say "     Copia nella sua cartella  /home/$RAPTOR_USER  questi file (trasferimento Auto o Binario, mai ASCII):"
 say "        - raptor-02-installa.sh"
 say "        - il pacchetto  raptor_full_0.16.10_con_modelli.tar.gz  e il suo .sha256"

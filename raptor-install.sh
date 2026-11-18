@@ -106,7 +106,7 @@ exec bash "$DEST/raptor-02-installa.sh" --yes --no-telegram
 PHASE2_EOF
 chmod 755 "$PHASE2"   # leggibile da raptor (lo esegue "su - raptor"), non solo da orangepi che l'ha creato
 
-say "Ora ti chiedo la ${C_B}password di raptor${C_0} (quella appena scelta nel passo 2) per continuare da quell'utente."
+say "Ora ti chiedo la ${C_B}password di raptor${C_0} per continuare da quell'utente: quella che hai appena scelto nel passo 2, oppure -- se raptor ce l'aveva gia' e il passo 2 l'ha lasciata com'e' -- quella che aveva gia'."
 if ! su - raptor -c "bash '$PHASE2' '$REPO_RAW/raptor-02-installa.sh' '$PACKAGE_URL'"; then
   die "il passo 2 ha avuto problemi (vedi sopra). Puoi rilanciare solo questa parte entrando come raptor:
        ssh raptor@$(hostname -I 2>/dev/null | awk '{print $1}')
