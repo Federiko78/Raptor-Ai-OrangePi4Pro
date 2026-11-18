@@ -7,8 +7,10 @@
 # "senza modelli", i modelli in /opt/raptor/models.
 #
 # Cosa fa, in dodici passi (e dice sempre cosa sta facendo):
-#    1. controlla l'ambiente e il pacchetto (non cambia nulla); poi ti chiede conferma
-#    2. cambia le password di root e orangepi (oggi sono quelle di fabbrica): le scrivi TU, nascoste
+#    1. controlla l'ambiente e il pacchetto, e si accorge da solo se Raptor c'e' gia' in /opt/raptor (aggiornamento/ripetizione,
+#       non prima installazione); poi ti chiede conferma
+#    2. prima installazione: cambia le password di root e orangepi (oggi sono quelle di fabbrica), le scrivi TU, nascoste.
+#       Aggiornamento: saltato, restano quelle gia' scelte
 #    3. nome della scheda, fuso orario, sincronizzazione dell'ora (chrony)
 #    4. blocca gli aggiornamenti automatici del sistema (apt-daily/unattended-upgrades) e il pacchetto del kernel
 #    5. installa i pacchetti che mancano (ffmpeg, numpy, opencv, yaml, cryptography, gcc, nftables, ...)
@@ -17,15 +19,18 @@
 #    8. verifica il pacchetto, lo estrae in /opt/raptor e controlla ogni file (MANIFEST.sha256)
 #    9. compila la libreria NPU (libraptor_npu.so)
 #   10. controlla i modelli (quelli del pacchetto, o copiati con FileZilla) e li sistema
-#   11. installa raptor-auth e raptor-admin; Telegram (se vuoi: token del bot e destinatari, digitati da te)
-#   12. installa e avvia i 5 servizi, controlla che tutto sia acceso e ti dice l'indirizzo del pannello
+#   11. installa raptor-auth e raptor-admin; Telegram, solo in prima installazione e solo se vuoi (token del bot e
+#       destinatari, digitati da te) -- in aggiornamento, se c'e' gia' una configurazione, la lascia
+#   12. installa e avvia i 5 servizi, controlla che tutto sia acceso e ti dice l'indirizzo del pannello.
+#       In aggiornamento (programma cambiato) riavvia lui stesso i 5 servizi, cosi' la nuova versione parte subito
+#       invece di restare caricata in memoria quella vecchia
 #
 # L'amministratore del pannello NON lo crea lo script: lo crei dalla pagina web di Raptor (prima la licenza, poi la password).
 # Non fa "apt upgrade", e dal passo 4 blocca anche gli aggiornamenti automatici in background: su queste schede un
 # aggiornamento del kernel o dei driver (anche se arriva da solo di notte) puo' rompere l'NPU -- deve essere sempre
 # una scelta esplicita, mai qualcosa che succede senza che nessuno lo decida.
-# Si puo' rilanciare: se Raptor e' gia' installato con la stessa versione rifa' i passi (config, dati e modelli non si toccano);
-# con un'altra versione si ferma: per aggiornare usa il pacchetto di aggiornamento, oppure --force.
+# Si puo' rilanciare quante volte vuoi, anche per aggiornare a una versione diversa: riconosce da solo che Raptor c'e'
+# gia' in /opt/raptor (stessa versione o diversa) e si comporta di conseguenza -- config, dati e modelli non si toccano mai.
 #
 # Uso (sulla scheda, come utente raptor: lo script si fa dare i permessi di root chiedendoti la password di root,
 # che su una scheda nuova e' quella di fabbrica; il passo 2 la cambia subito):
@@ -41,14 +46,15 @@
 #     --telegram           configura Telegram senza chiederlo          --no-telegram: non chiederlo
 #     --no-npu-build       non compilare la libreria NPU
 #     --yes                risponde con la scelta predefinita alle domande si/no (password, nome e Telegram restano a te)
-#     --force              prosegue anche se la scheda non sembra una Orange Pi 4 Pro con Debian 12, o se Raptor c'e' gia'
+#     --force              prosegue anche se la scheda non sembra una Orange Pi 4 Pro con Debian 12 o l'orologio e' indietro
+#                           (non serve piu' per aggiornare: un Raptor gia' installato viene riconosciuto da solo)
 #     --help
 #
 # Un registro (senza password ne' token) resta in /root/raptor-installa-DATA.log
 # =====================================================================================================================
 set -u -o pipefail
 
-SCRIPT_VERSION="3.0.0"
+SCRIPT_VERSION="3.1.0"
 ORIG_ARGS=("$@")
 ELEVATED=0
 RAPTOR_USER="raptor"
@@ -65,6 +71,7 @@ ASSUME_YES=0
 FORCE=0
 NSTEPS=12
 SKIP_PASSWORDS=0
+UPGRADE=0                              # set below, step 1: Raptor is already in $R (any version) -- an upgrade/repair, not a first install
 
 # librerie NPU dell'immagine della scheda di riferimento (solo per dire se sono uguali o diverse)
 REF_VIPHAL="648444a26a1aeaec0182c0ba348b7a453134b8ccdf8282a211ce4c0f5e5e51a0"
@@ -395,15 +402,12 @@ fi
 TAR_PROBLEMS=$((N_BAD - NB_TAR0))
 
 if [ -f "$R/web/web.py" ]; then
+  UPGRADE=1
   OLD="$(sed -n 's/^VERSION *= *"\(.*\)".*/\1/p' "$R/web/web.py" | head -1)"
   if [ -n "$VER" ] && [ "${OLD:-}" = "$VER" ]; then
     info "Raptor $OLD e' gia' installato in $R (stessa versione del pacchetto): rifaccio i passi; il programma viene riscritto uguale, config, dati e modelli non si toccano"
-  elif [ "$FORCE" != 1 ] && [ "$CHECK_ONLY" != 1 ]; then
-    die "in $R c'e' gia' Raptor ${OLD:-?}, il pacchetto e' la ${VER:-?}. Questo script e' per la prima installazione.
-       Per aggiornare:   usa il pacchetto di aggiornamento della versione (non questo script)
-       Per sostituire il programma con questo pacchetto (config, dati e modelli restano):  rilancia con --force"
   else
-    warn "Raptor ${OLD:-?} e' gia' installato in $R: con --force lo sostituisco con la ${VER:-?} (config, dati e modelli non si toccano)"
+    info "Raptor ${OLD:-?} e' gia' installato in $R: aggiorno alla ${VER:-?} (config, dati e modelli non si toccano). Riconosciuto da solo come aggiornamento: niente --force, niente domande su password o Telegram gia' impostati; i servizi il cui programma e' cambiato li riavvio da solo al passo 12"
   fi
 fi
 
@@ -449,7 +453,9 @@ ask_yn "Procedo?" s || die "interrotto, non ho cambiato nulla"
 
 # ================================================================================================ 2. password
 step 2 "Password di root e orangepi"
-if [ "$SKIP_PASSWORDS" = 1 ]; then
+if [ "$UPGRADE" = 1 ]; then
+  info "aggiornamento: Raptor e' gia' installato, quindi le password sono gia' state scelte. Non le tocco (cambiale tu con 'passwd' se vuoi)"
+elif [ "$SKIP_PASSWORDS" = 1 ]; then
   say "  (--no-passwords: non cambio nessuna password)"
 else
   say "  Scrivi tu le nuove password: restano nascoste e non finiscono nel registro. Almeno 8 caratteri; le password comuni (orangepi, root, password...) vengono rifiutate."
@@ -797,6 +803,19 @@ step 12 "Servizi (partono anche a ogni avvio della scheda) e controlli finali"
 python3 -I "$R/services/raptor_services.py" install 2>&1 | tee -a "$LOG" | sed 's/^/         /'
 RC="${PIPESTATUS[0]}"
 if [ "$RC" -eq 0 ]; then ok "5 servizi installati, abilitati e avviati; controllo di indipendenza superato"; else bad "l'installazione dei servizi ha segnalato problemi (sopra)"; fi
+
+# raptor_services.py install() non riavvia mai un servizio gia' attivo (sceglie cosi' apposta, per non fermare la
+# sorveglianza con un semplice "rilancia lo script"); ma qui e' un aggiornamento appena estratto in $R, quindi i 5
+# servizi vanno riavviati per forza, altrimenti restano in memoria col programma vecchio (es. il pannello continua a
+# mostrare la versione precedente finche' qualcuno non li riavvia a mano).
+if [ "$UPGRADE" = 1 ] && [ "${OLD:-}" != "${VER:-}" ]; then
+  info "aggiornamento ${OLD:-?} -> $VER: riavvio i 5 servizi perche' il programma e' cambiato (qualche secondo di interruzione)"
+  if systemctl restart raptor-detector raptor-web raptor-watchdog raptor-notifications raptor-alarm-monitor 2>>"$LOG"; then
+    ok "5 servizi riavviati"
+  else
+    bad "il riavvio di uno o piu' servizi ha dato un errore (vedi il registro): guarda sotto quali sono attivi e, se serve, riavvia a mano con 'systemctl restart raptor-NOME'"
+  fi
+fi
 
 for u in detector web watchdog notifications alarm-monitor; do
   st="inactive"
