@@ -19,8 +19,8 @@
 #    8. verifica il pacchetto, lo estrae in /opt/raptor e controlla ogni file (MANIFEST.sha256)
 #    9. compila la libreria NPU (libraptor_npu.so)
 #   10. controlla i modelli (quelli del pacchetto, o copiati con FileZilla) e li sistema
-#   11. installa raptor-auth e raptor-admin; Telegram, solo in prima installazione e solo se vuoi (token del bot e
-#       destinatari, digitati da te) -- in aggiornamento, se c'e' gia' una configurazione, la lascia
+#   11. installa raptor-auth e raptor-admin. Telegram ed e-mail NON si configurano piu' da qui: si fanno dal pannello,
+#       pagina Notifications (token del bot e destinatari non passano mai per lo script o per il suo registro)
 #   12. installa e avvia i 5 servizi, controlla che tutto sia acceso e ti dice l'indirizzo del pannello.
 #       In aggiornamento (programma cambiato) riavvia lui stesso i 5 servizi, cosi' la nuova versione parte subito
 #       invece di restare caricata in memoria quella vecchia
@@ -43,9 +43,8 @@
 #     --timezone ZONA      fuso orario (predefinito: Europe/Rome)
 #     --no-passwords       non cambia le password di root e orangepi (le controlla soltanto)
 #     --no-tailscale       non installare Tailscale
-#     --telegram           configura Telegram senza chiederlo          --no-telegram: non chiederlo
 #     --no-npu-build       non compilare la libreria NPU
-#     --yes                risponde con la scelta predefinita alle domande si/no (password, nome e Telegram restano a te)
+#     --yes                risponde con la scelta predefinita alle domande si/no (password e nome restano a te)
 #     --force              prosegue anche se la scheda non sembra una Orange Pi 4 Pro con Debian 12 o l'orologio e' indietro
 #                           (non serve piu' per aggiornare: un Raptor gia' installato viene riconosciuto da solo)
 #     --help
@@ -54,7 +53,7 @@
 # =====================================================================================================================
 set -u -o pipefail
 
-SCRIPT_VERSION="3.1.0"
+SCRIPT_VERSION="3.2.0"
 ORIG_ARGS=("$@")
 ELEVATED=0
 RAPTOR_USER="raptor"
@@ -65,7 +64,6 @@ WANT_HOSTNAME=""
 TAR=""
 CHECK_ONLY=0
 TAILSCALE="yes"                        # yes (di serie) | no
-TELEGRAM="ask"                         # ask | yes | no
 NPU_BUILD=1
 ASSUME_YES=0
 FORCE=0
@@ -92,8 +90,6 @@ while [ $# -gt 0 ]; do
     --no-passwords|--skip-passwords) SKIP_PASSWORDS=1 ;;
     --no-tailscale) TAILSCALE="no" ;;
     --with-tailscale) TAILSCALE="yes" ;;          # gia' il comportamento di serie
-    --telegram) TELEGRAM="yes" ;;
-    --no-telegram) TELEGRAM="no" ;;
     --no-npu-build) NPU_BUILD=0 ;;
     --yes|-y) ASSUME_YES=1 ;;
     --force) FORCE=1 ;;
@@ -137,20 +133,6 @@ ask_text() {    # ask_text "domanda" "predefinito" -> $REPLY_TEXT   (le risposte
   IFS= read -r a || a=""
   REPLY_TEXT="${a:-$def}"
   printf '%s -> %s\n' "$q" "$REPLY_TEXT" >>"$LOG" 2>/dev/null || true
-}
-
-ask_private() { # come ask_text ma la risposta NON va nel registro (chat ID)
-  local q="$1" a
-  printf '  %s ' "$q" >&2
-  IFS= read -r a || a=""
-  REPLY_TEXT="$a"
-}
-
-ask_secret() {  # ask_secret "domanda" -> $SECRET_TEXT (non va mai nel registro)
-  local a
-  printf '  %s ' "$1" >&2
-  IFS= read -rs a || a=""; printf '\n' >&2
-  SECRET_TEXT="$a"
 }
 
 as_raptor() { ( cd / && runuser -u "$RAPTOR_USER" -- env RAPTOR_ROOT="$R" "$@" ); }
@@ -407,7 +389,7 @@ if [ -f "$R/web/web.py" ]; then
   if [ -n "$VER" ] && [ "${OLD:-}" = "$VER" ]; then
     info "Raptor $OLD e' gia' installato in $R (stessa versione del pacchetto): rifaccio i passi; il programma viene riscritto uguale, config, dati e modelli non si toccano"
   else
-    info "Raptor ${OLD:-?} e' gia' installato in $R: aggiorno alla ${VER:-?} (config, dati e modelli non si toccano). Riconosciuto da solo come aggiornamento: niente --force, niente domande su password o Telegram gia' impostati; i servizi il cui programma e' cambiato li riavvio da solo al passo 12"
+    info "Raptor ${OLD:-?} e' gia' installato in $R: aggiorno alla ${VER:-?} (config, dati e modelli non si toccano). Riconosciuto da solo come aggiornamento: niente --force, niente domande sulla password gia' impostata; i servizi il cui programma e' cambiato li riavvio da solo al passo 12"
   fi
 fi
 
@@ -712,91 +694,17 @@ elif [ "${N_BADM:-0}" -eq 0 ]; then
   warn "nessun modello in $MODELS: senza non c'e' rilevamento. Copiali con FileZilla in $MODELS e rilancia questo script (rifa' solo quello che manca)"
 fi
 
-# ================================================================================================ 11. root e Telegram
-step 11 "Programmi di root e Telegram"
+# ================================================================================================ 11. root e notifiche
+step 11 "Programmi di root"
 if python3 -I "$R/bin/raptor-auth" install >>"$LOG" 2>&1 && [ -x /usr/local/sbin/raptor-auth ]; then ok "raptor-auth installato in /usr/local/sbin (recupero password del pannello)"
 else bad "installazione di raptor-auth fallita"; fi
 if python3 -I "$R/services/admin/install.py" >>"$LOG" 2>&1; then ok "raptor-admin installato (rete, ora, spegnimento, assistenza remota dal pannello)"
 else bad "installazione di raptor-admin fallita (vedi il registro; ricontrolla con: python3 -I $R/services/admin/install.py status)"; fi
 if [ -f "$R/config/auth.yaml" ]; then ok "gli accessi del pannello esistono gia' ($R/config/auth.yaml): non li tocco"
 else info "l'amministratore del pannello lo crei dalla pagina web, non da riga di comando (vedi in fondo)"; fi
-
-DO_TG=0
-case "$TELEGRAM" in
-  yes) DO_TG=1 ;;
-  no) DO_TG=0 ;;
-  *) if [ -f "$R/config/notifications.yaml" ]; then info "esiste gia' una configurazione delle notifiche: la lascio"
-     else ask_yn "Configuro adesso Telegram (token del bot e destinatari)? Altrimenti lo fai dal pannello, pagina Notifications." s && DO_TG=1; fi ;;
-esac
-if [ "$DO_TG" = 1 ]; then
-  say "  Il token lo prendi da @BotFather (quello del bot che usi gia'). Non viene mostrato ne' scritto nel registro."
-  ask_secret "Token del bot (INVIO a vuoto = salta):"
-  TG_TOKEN="$SECRET_TEXT"; SECRET_TEXT=""
-  if [ -z "$TG_TOKEN" ]; then
-    info "Telegram saltato: lo configuri dal pannello (Notifications)"
-  elif printf '%s' "$TG_TOKEN" | grep -Eq '[[:space:]]' || [ "${#TG_TOKEN}" -gt 200 ]; then
-    bad "il token non sembra valido (contiene spazi o e' troppo lungo): Telegram non configurato"
-  else
-    BOT="$(printf '%s' "$TG_TOKEN" | python3 -I -c '
-import json, sys, urllib.request
-t = sys.stdin.read().strip()
-try:
-    with urllib.request.urlopen("https://api.telegram.org/bot%s/getMe" % t, timeout=12) as r:
-        d = json.load(r)
-    print("OK:" + str(d["result"].get("username", "")) if d.get("ok") else "NO:risposta negativa")
-except Exception as e:
-    print("NO:" + type(e).__name__)
-' 2>/dev/null)"
-    TG_SAVE=1
-    case "$BOT" in
-      OK:*) ok "token valido: bot @${BOT#OK:}" ;;
-      NO:HTTPError) bad "Telegram ha rifiutato il token (sbagliato o revocato)"; ask_yn "Lo salvo lo stesso?" n || TG_SAVE=0 ;;
-      *) warn "non riesco a verificare il token adesso (${BOT#NO:}: rete assente?)"; ask_yn "Lo salvo lo stesso?" s || TG_SAVE=0 ;;
-    esac
-    if [ "$TG_SAVE" = 1 ]; then
-      RECIPIENTS=""
-      while :; do
-        ask_private "Chat ID del destinatario (numero, es. 123456789; INVIO a vuoto = finito):"
-        CHAT="$REPLY_TEXT"; [ -z "$CHAT" ] && break
-        if ! printf '%s' "$CHAT" | grep -Eq '^-?[0-9]{1,20}$'; then say "  Il chat ID e' un numero (anche negativo per i gruppi). Riprova."; continue; fi
-        ask_text "Nome del destinatario (come lo vedi nel pannello)" "Destinatario $(( $(printf '%s' "$RECIPIENTS" | grep -c .) + 1 ))"
-        RNAME="$REPLY_TEXT"
-        RECIPIENTS="${RECIPIENTS}${CHAT}|${RNAME}"$'\n'
-        ok "destinatario aggiunto: $RNAME"
-        ask_yn "Un altro destinatario?" n || break
-      done
-      PYTG='
-import os, sys, yaml
-path = sys.argv[1]
-lines = sys.stdin.read().split("\n")
-token = lines[0].strip()
-recips = []
-for row in lines[1:]:
-    if "|" in row:
-        chat, name = row.split("|", 1)
-        recips.append({"name": name.strip()[:80], "chat_id": chat.strip(), "enabled": True, "override": False, "event_ai": True,
-                       "alarm_status": True, "camera_status": True, "alarm_input": True, "rtsp_status": True, "system_status": True, "time": False})
-cfg = {"version": 3, "enabled": True,
-       "telegram": {"enabled": bool(recips), "bot_token": token, "recipients": recips},
-       "email": {"enabled": False, "smtp_host": "", "smtp_port": 587, "security": "starttls", "username": "", "password": "",
-                 "from_email": "", "from_name": "RAPTOR AI Security", "recipients": []}}
-tmp = path + ".tmp"
-fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-with os.fdopen(fd, "w", encoding="utf-8") as fh:
-    yaml.safe_dump(cfg, fh, sort_keys=False, allow_unicode=True, default_flow_style=False, indent=2, width=120)
-    fh.flush(); os.fsync(fh.fileno())
-os.replace(tmp, path); os.chmod(path, 0o600)
-print("scritto:%d" % len(recips))
-'
-      if OUT="$(printf '%s\n%s' "$TG_TOKEN" "$RECIPIENTS" | as_raptor python3 -I -c "$PYTG" "$R/config/notifications.yaml" 2>&1)"; then
-        ok "Telegram configurato ($R/config/notifications.yaml, permessi 600): ${OUT#scritto:} destinatari"
-        [ "${OUT#scritto:}" = 0 ] && warn "nessun destinatario: aggiungine uno dalla pagina Notifications del pannello (Telegram resta spento finche' non c'e')"
-        info "i messaggi attivi per ogni destinatario: eventi AI, allarme, telecamere, RTSP, sistema (cambiabili dal pannello); prova con il tasto TEST"
-      else bad "scrittura della configurazione Telegram fallita"; fi
-    fi
-  fi
-  TG_TOKEN=""; RECIPIENTS=""
-fi
+# Telegram e e-mail non si configurano piu' da qui, nemmeno se config/notifications.yaml non esiste ancora: si fanno
+# sempre dal pannello, pagina Notifications (token del bot e destinatari non devono passare per lo script o il registro).
+info "notifiche (Telegram, e-mail): le configuri dal pannello, pagina Notifications"
 
 # ================================================================================================ 12. servizi e controlli
 step 12 "Servizi (partono anche a ogni avvio della scheda) e controlli finali"

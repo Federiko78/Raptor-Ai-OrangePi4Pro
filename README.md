@@ -70,6 +70,11 @@ curl -fsSL https://raw.githubusercontent.com/Federiko78/Raptor-Ai-OrangePi4Pro/m
 The first time you create the admin account in the panel, Raptor AI starts a **30-day free trial** on its own — no internet connection, activation code, or contact with us required. The trial gives you:
 
 - 1 camera
-- the STANDARD-tier features (Live Stream, Intrusion AI, Events AI, Camera Manager, the GPIO alarm relay)
+- the STANDARD-tier features (Live Stream, Intrusion AI, Events AI, Camera Manager, Settings, operator accounts, and Maintenance — backup, restore, reset)
 
-A banner in the panel shows how many days are left. When the trial ends, or whenever you're ready for more cameras or the higher tiers (Statistics, Watchdog, Camera Manager's network search, Telegram/e-mail notifications, Logs), activate a paid licence from the same panel — that step does need an internet connection, to reach our licensing server.
+A banner in the panel shows how many days are left. When the trial ends, or whenever you're ready for more cameras or the higher tiers, activate a paid licence from the same panel — that step does need an internet connection, to reach our licensing server. The paid tiers add:
+
+- **PRO** — Statistics, Camera Manager's network search, and Telegram/e-mail notifications
+- **FULL** — Watchdog, the alarm input/relay panel and its HTTP alarm to a central station, the mini video clip, Tailscale remote assistance, and Logs
+
+The panel's Settings → License page always shows exactly what your edition includes, and lets you compare editions.
