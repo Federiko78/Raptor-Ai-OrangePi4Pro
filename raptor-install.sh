@@ -102,7 +102,7 @@ DEST="$HOME"
 curl -fsSL --retry 3 --retry-delay 2 -o "$DEST/raptor-02-installa.sh" "$1" || { echo "scaricamento di raptor-02-installa.sh fallito"; exit 1; }
 curl -fsSL --retry 3 --retry-delay 2 -o "$DEST/raptor_full_compiled.tar.gz" "$2" || { echo "scaricamento del pacchetto fallito"; exit 1; }
 chmod +x "$DEST/raptor-02-installa.sh"
-exec bash "$DEST/raptor-02-installa.sh" --yes --no-telegram
+exec bash "$DEST/raptor-02-installa.sh" --yes
 PHASE2_EOF
 chmod 755 "$PHASE2"   # leggibile da raptor (lo esegue "su - raptor"), non solo da orangepi che l'ha creato
 
