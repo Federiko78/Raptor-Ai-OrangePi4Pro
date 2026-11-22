@@ -6,7 +6,7 @@
 # in /home/raptor: questo script, il pacchetto raptor_full_0.16.10_*.tar.gz (con il suo .sha256) e, se il pacchetto e' quello
 # "senza modelli", i modelli in /opt/raptor/models.
 #
-# Cosa fa, in dodici passi (e dice sempre cosa sta facendo):
+# Cosa fa, in tredici passi (e dice sempre cosa sta facendo):
 #    1. controlla l'ambiente e il pacchetto, e si accorge da solo se Raptor c'e' gia' in /opt/raptor (aggiornamento/ripetizione,
 #       non prima installazione); poi ti chiede conferma
 #    2. prima installazione: cambia le password di root e orangepi (oggi sono quelle di fabbrica), le scrivi TU, nascoste.
@@ -16,12 +16,14 @@
 #    5. installa i pacchetti che mancano (ffmpeg, numpy, opencv, yaml, cryptography, gcc, nftables, ...)
 #    6. crea l'ambiente virtuale Python
 #    7. installa Tailscale (assistenza remota dal pannello): di serie si', --no-tailscale per non installarlo
-#    8. verifica il pacchetto, lo estrae in /opt/raptor e controlla ogni file (MANIFEST.sha256)
-#    9. compila la libreria NPU (libraptor_npu.so)
-#   10. controlla i modelli (quelli del pacchetto, o copiati con FileZilla) e li sistema
-#   11. installa raptor-auth e raptor-admin. Telegram ed e-mail NON si configurano piu' da qui: si fanno dal pannello,
+#    8. se il kernel di questa scheda non ha il modulo tun (serve a Tailscale per creare il tunnel), lo compila dai
+#       sorgenti ufficiali del kernel della scheda e lo installa; se c'e' gia' non fa nulla
+#    9. verifica il pacchetto, lo estrae in /opt/raptor e controlla ogni file (MANIFEST.sha256)
+#   10. compila la libreria NPU (libraptor_npu.so)
+#   11. controlla i modelli (quelli del pacchetto, o copiati con FileZilla) e li sistema
+#   12. installa raptor-auth e raptor-admin. Telegram ed e-mail NON si configurano piu' da qui: si fanno dal pannello,
 #       pagina Notifications (token del bot e destinatari non passano mai per lo script o per il suo registro)
-#   12. installa e avvia i 5 servizi, controlla che tutto sia acceso e ti dice l'indirizzo del pannello.
+#   13. installa e avvia i 5 servizi, controlla che tutto sia acceso e ti dice l'indirizzo del pannello.
 #       In aggiornamento (programma cambiato) riavvia lui stesso i 5 servizi, cosi' la nuova versione parte subito
 #       invece di restare caricata in memoria quella vecchia
 #
@@ -53,7 +55,7 @@
 # =====================================================================================================================
 set -u -o pipefail
 
-SCRIPT_VERSION="3.2.0"
+SCRIPT_VERSION="3.3.0"
 ORIG_ARGS=("$@")
 ELEVATED=0
 RAPTOR_USER="raptor"
@@ -67,7 +69,7 @@ TAILSCALE="yes"                        # yes (di serie) | no
 NPU_BUILD=1
 ASSUME_YES=0
 FORCE=0
-NSTEPS=12
+NSTEPS=13
 SKIP_PASSWORDS=0
 UPGRADE=0                              # set below, step 1: Raptor is already in $R (any version) -- an upgrade/repair, not a first install
 
@@ -389,7 +391,7 @@ if [ -f "$R/web/web.py" ]; then
   if [ -n "$VER" ] && [ "${OLD:-}" = "$VER" ]; then
     info "Raptor $OLD e' gia' installato in $R (stessa versione del pacchetto): rifaccio i passi; il programma viene riscritto uguale, config, dati e modelli non si toccano"
   else
-    info "Raptor ${OLD:-?} e' gia' installato in $R: aggiorno alla ${VER:-?} (config, dati e modelli non si toccano). Riconosciuto da solo come aggiornamento: niente --force, niente domande sulla password gia' impostata; i servizi il cui programma e' cambiato li riavvio da solo al passo 12"
+    info "Raptor ${OLD:-?} e' gia' installato in $R: aggiorno alla ${VER:-?} (config, dati e modelli non si toccano). Riconosciuto da solo come aggiornamento: niente --force, niente domande sulla password gia' impostata; i servizi il cui programma e' cambiato li riavvio da solo al passo 13"
   fi
 fi
 
@@ -593,8 +595,66 @@ else
   fi
 fi
 
-# ================================================================================================ 8. programma
-step 8 "Programma in $R"
+# ================================================================================================ 8. modulo kernel tun
+step 8 "Modulo kernel TUN (serve a Tailscale: il kernel di questa scheda non lo includeva)"
+KVER="$(uname -r)"
+if modprobe tun >/dev/null 2>&1 && [ -e /dev/net/tun ]; then
+  ok "il modulo tun c'e' gia' (kernel $KVER): niente da compilare"
+elif [ "$TAILSCALE" = no ]; then
+  info "tun non compilato (--no-tailscale). Se installi Tailscale dopo, serve anche questo: rilancia lo script senza --no-tailscale"
+elif [ "$NET" != 1 ]; then
+  warn "niente rete: non posso scaricare i sorgenti del kernel per compilare tun. Tailscale resta installato ma non si potra' collegare finche' non lo fai a mano (rilancia lo script quando la rete c'e')"
+elif [ ! -r /proc/config.gz ]; then
+  warn "non trovo /proc/config.gz (configurazione del kernel in esecuzione): non posso compilare tun. Serve assistenza"
+else
+  TUN_BASE="${KVER%-*}"                                  # es. 6.6.98 da 6.6.98-sun60iw2
+  TUN_EXTRA="${KVER#$TUN_BASE}"                           # es. -sun60iw2
+  TUN_MAJMIN="$(printf '%s' "$TUN_BASE" | cut -d. -f1-2)" # es. 6.6
+  TUN_BRANCH="orange-pi-$TUN_MAJMIN-${TUN_EXTRA#-}"       # es. orange-pi-6.6-sun60iw2 (convenzione Xunlong)
+  TUN_WORK="$R/build/kernel-tun"
+  TUN_FREE_KB="$(df -Pk "$R" 2>/dev/null | awk 'NR==2{print $4}')"
+  if [ -z "$TUN_EXTRA" ] || [ "$TUN_EXTRA" = "$KVER" ]; then
+    warn "la versione del kernel ($KVER) non e' nella forma che mi aspetto (X.Y.Z-nomechip): non provo a compilare tun. Tailscale resta installato ma senza questo modulo non si potra' collegare"
+  elif [ -n "$TUN_FREE_KB" ] && [ "$TUN_FREE_KB" -lt 4000000 ]; then
+    warn "poco spazio libero su disco (meno di 4 GB liberi su $R): per compilare il kernel non basta. Libera spazio e rilancia lo script per riprovare"
+  else
+    say "  Il kernel di questa scheda non ha il modulo tun: lo compilo dai sorgenti ufficiali Xunlong (ramo $TUN_BRANCH, stessa versione $KVER). Puo' volerci anche mezz'ora: non interrompere."
+    mkdir -p "$TUN_WORK"
+    BUILD_OK=1
+    if [ ! -d "$TUN_WORK/src/.git" ]; then
+      rm -rf "$TUN_WORK/src"
+      git clone --depth 1 --branch "$TUN_BRANCH" https://github.com/orangepi-xunlong/linux-orangepi.git "$TUN_WORK/src" >>"$LOG" 2>&1 || BUILD_OK=0
+    fi
+    if [ "$BUILD_OK" = 1 ]; then
+      ( cd "$TUN_WORK/src" \
+          && zcat /proc/config.gz >.config \
+          && scripts/config --module CONFIG_TUN \
+          && make olddefconfig >>"$LOG" 2>&1 \
+          && make EXTRAVERSION="$TUN_EXTRA" LOCALVERSION= -j"$(nproc)" vmlinux >>"$LOG" 2>&1 \
+          && make EXTRAVERSION="$TUN_EXTRA" LOCALVERSION= drivers/net/tun.ko >>"$LOG" 2>&1
+      ) || BUILD_OK=0
+    fi
+    TUN_KO="$TUN_WORK/src/drivers/net/tun.ko"
+    TUN_MAGIC=""
+    if [ "$BUILD_OK" = 1 ] && [ -f "$TUN_KO" ]; then
+      TUN_MAGIC="$( { /sbin/modinfo "$TUN_KO" 2>/dev/null || /usr/sbin/modinfo "$TUN_KO" 2>/dev/null; } | awk -F': *' '/^vermagic/{print $2}' | awk '{print $1}')"
+    fi
+    if [ "$BUILD_OK" = 1 ] && [ "$TUN_MAGIC" = "$KVER" ]; then
+      install -D -m 0644 "$TUN_KO" "/lib/modules/$KVER/kernel/drivers/net/tun.ko" && depmod -a "$KVER" && modprobe tun
+      if [ -e /dev/net/tun ]; then
+        printf 'tun\n' >/etc/modules-load.d/raptor-tun.conf
+        ok "modulo tun compilato e caricato (kernel $KVER). Resta anche dopo un riavvio (/etc/modules-load.d/raptor-tun.conf); sorgenti lasciati in $TUN_WORK/src per un'eventuale ricompilazione"
+      else
+        warn "il modulo tun e' stato copiato ma /dev/net/tun non c'e': prova 'modprobe tun' a mano e controlla il registro $LOG"
+      fi
+    else
+      warn "compilazione del modulo tun non riuscita, o la versione non corrisponde a quella in uso (vedi il registro $LOG). Tailscale resta installato ma non si potra' collegare finche' tun non c'e': rilancia questo script per riprovare, o chiedi assistenza"
+    fi
+  fi
+fi
+
+# ================================================================================================ 9. programma
+step 9 "Programma in $R"
 PARENT="$(dirname "$R")"
 if tar -xzf "$TAR" -C "$PARENT" --strip-components=1 --no-same-owner --no-overwrite-dir >>"$LOG" 2>&1; then ok "programma estratto in $R"; else die "estrazione fallita (disco pieno? vedi il registro)"; fi
 for d in alarm bin common detector install native notifications services tests watchdog web; do
@@ -614,16 +674,16 @@ fi
 INSTALLED_VER="$(sed -n 's/^VERSION *= *"\(.*\)".*/\1/p' "$R/web/web.py" | head -1)"
 [ "$INSTALLED_VER" = "$VER" ] && ok "versione installata: $INSTALLED_VER" || bad "versione installata '$INSTALLED_VER' diversa da quella del pacchetto '$VER'"
 
-# ================================================================================================ 9. libreria NPU
-step 9 "Libreria NPU (libraptor_npu.so)"
+# ================================================================================================ 10. libreria NPU
+step 10 "Libreria NPU (libraptor_npu.so)"
 if [ "$NPU_BUILD" != 1 ]; then info "saltata (--no-npu-build)"
 elif [ ! -f "$R/native/vendor/include/vip_lite.h" ]; then warn "manca $R/native/vendor/include/vip_lite.h: libreria NPU non compilata"
 elif [ ! -f /usr/lib/libVIPhal.so ]; then warn "manca /usr/lib/libVIPhal.so: libreria NPU non compilata"
 elif as_raptor bash "$R/detector/npu/build.sh" >>"$LOG" 2>&1 && [ -f "$R/detector/npu/libraptor_npu.so" ]; then ok "libraptor_npu.so compilata"
 else bad "compilazione della libreria NPU fallita (vedi il registro): il motore funzionera' senza NPU finche' non la sistemi"; fi
 
-# ================================================================================================ 10. modelli
-step 10 "Modelli (in $R/models)"
+# ================================================================================================ 11. modelli
+step 11 "Modelli (in $R/models)"
 MODELS="$R/models"
 # a) la cartella copiata invece del suo contenuto: models/models/<id>/... -> models/<id>/...
 if [ -d "$MODELS/models" ]; then
@@ -694,8 +754,8 @@ elif [ "${N_BADM:-0}" -eq 0 ]; then
   warn "nessun modello in $MODELS: senza non c'e' rilevamento. Copiali con FileZilla in $MODELS e rilancia questo script (rifa' solo quello che manca)"
 fi
 
-# ================================================================================================ 11. root e notifiche
-step 11 "Programmi di root"
+# ================================================================================================ 12. root e notifiche
+step 12 "Programmi di root"
 if python3 -I "$R/bin/raptor-auth" install >>"$LOG" 2>&1 && [ -x /usr/local/sbin/raptor-auth ]; then ok "raptor-auth installato in /usr/local/sbin (recupero password del pannello)"
 else bad "installazione di raptor-auth fallita"; fi
 if python3 -I "$R/services/admin/install.py" >>"$LOG" 2>&1; then ok "raptor-admin installato (rete, ora, spegnimento, assistenza remota dal pannello)"
@@ -706,8 +766,8 @@ else info "l'amministratore del pannello lo crei dalla pagina web, non da riga d
 # sempre dal pannello, pagina Notifications (token del bot e destinatari non devono passare per lo script o il registro).
 info "notifiche (Telegram, e-mail): le configuri dal pannello, pagina Notifications"
 
-# ================================================================================================ 12. servizi e controlli
-step 12 "Servizi (partono anche a ogni avvio della scheda) e controlli finali"
+# ================================================================================================ 13. servizi e controlli
+step 13 "Servizi (partono anche a ogni avvio della scheda) e controlli finali"
 python3 -I "$R/services/raptor_services.py" install 2>&1 | tee -a "$LOG" | sed 's/^/         /'
 RC="${PIPESTATUS[0]}"
 if [ "$RC" -eq 0 ]; then ok "5 servizi installati, abilitati e avviati; controllo di indipendenza superato"; else bad "l'installazione dei servizi ha segnalato problemi (sopra)"; fi
