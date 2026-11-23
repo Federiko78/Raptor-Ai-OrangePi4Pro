@@ -101,6 +101,13 @@ set -u -o pipefail
 DEST="$HOME"
 curl -fsSL --retry 3 --retry-delay 2 -o "$DEST/raptor-02-installa.sh" "$1" || { echo "scaricamento di raptor-02-installa.sh fallito"; exit 1; }
 curl -fsSL --retry 3 --retry-delay 2 -o "$DEST/raptor_full_compiled.tar.gz" "$2" || { echo "scaricamento del pacchetto fallito"; exit 1; }
+# Pacchetto appena scaricato: un .sha256 lasciato qui da un tentativo precedente (es. una prova manuale
+# con un pacchetto diverso) confronterebbe questo file nuovo con una somma vecchia, facendolo sembrare
+# "danneggiato" anche se e' perfetto -- lo si toglie di mezzo e si prova a scaricare quello giusto per
+# QUESTO pacchetto (stesso URL + ".sha256"); se la release non lo ha, resta senza, cosi' raptor-02-installa.sh
+# lo segnala solo come "non verificabile" (avviso) invece di un falso allarme di corruzione.
+rm -f "$DEST/raptor_full_compiled.tar.gz.sha256"
+curl -fsSL --retry 3 --retry-delay 2 -o "$DEST/raptor_full_compiled.tar.gz.sha256" "$2.sha256" 2>/dev/null || rm -f "$DEST/raptor_full_compiled.tar.gz.sha256"
 chmod +x "$DEST/raptor-02-installa.sh"
 exec bash "$DEST/raptor-02-installa.sh" --yes
 PHASE2_EOF
@@ -112,7 +119,9 @@ if ! su - raptor -c "bash '$PHASE2' '$REPO_RAW/raptor-02-installa.sh' '$PACKAGE_
        ssh raptor@$(hostname -I 2>/dev/null | awk '{print $1}')
    poi:
        curl -fsSL '$REPO_RAW/raptor-02-installa.sh' -o raptor-02-installa.sh
+       rm -f raptor_full_compiled.tar.gz.sha256
        curl -fsSL '$PACKAGE_URL' -o raptor_full_compiled.tar.gz
+       curl -fsSL '$PACKAGE_URL.sha256' -o raptor_full_compiled.tar.gz.sha256
        bash raptor-02-installa.sh"
 fi
 
